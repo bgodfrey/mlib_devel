@@ -91,6 +91,9 @@ elseif strcmp(getenv('JASPER_BACKEND'), 'vitis')
     build_cmd = [python_path ' -E ' jasper_python ' -m ' modelpath ' --middleware --backend --software --vitis'];
 elseif strcmp(getenv('JASPER_BACKEND'), 'ise')
     build_cmd = [python_path ' -E ' jasper_python ' -m ' modelpath ' --middleware --backend --software --be ise'];
+elseif strcmp(getenv('JASPER_BACKEND'), 'quartus')
+    build_cmd = [python_path ' -E ' jasper_python ' -m ' modelpath ' --middleware --backend --software quartus'];
+
 end
 
 disp('************************************');
