@@ -16,6 +16,17 @@ if strcmp(jasper_backend, 'vivado') || strcmp(jasper_backend, 'vitis') || isempt
   if ~isempty(getenv('DSP_HDL_SL_PATH'))
     addpath(getenv('DSP_HDL_SL_PATH'));
   end
+%if quartus is to be used
+elseif strcmp(jasper_backend, 'quartus')
+  disp('Starting Model Composer backend is quartus')
+  addpath([getenv('MLIB_DEVEL_PATH'), '/casper_library']);
+  addpath([getenv('MLIB_DEVEL_PATH'), '/pd_library']);
+  addpath([getenv('MLIB_DEVEL_PATH'), '/xps_library']);
+  addpath([getenv('MLIB_DEVEL_PATH'), '/jasper_library']);
+  %addpath(getenv('HDL_DSP_DEVEL'));
+  if ~isempty(getenv('DSP_HDL_SL_PATH'))
+    addpath(getenv('DSP_HDL_SL_PATH'));
+  end
 %if ISE is to be used  
 elseif strcmp(jasper_backend, 'ise')
   disp('Starting ISE Sysgen')
@@ -44,8 +55,16 @@ end
 
 % The load_system function causes a segfault when run with the Matlab 2021a and Vivado 2021.1
 % but the libraries are still accessable even without loading them.
+
 load_system('casper_library');
-load_system('xps_library');
+
+if strcmp(jasper_backend, 'quartus')
+  load_system(['xps_library';'pd_library']);
+  disp('Loaded xps and pd');
+else
+  load_system('xps_library');
+end
+
 if ~isempty(getenv('DSP_HDL_SL_PATH'))
   load_system('hdl_library');
 end

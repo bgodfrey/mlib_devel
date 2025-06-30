@@ -320,9 +320,9 @@ class Toolflow(object):
                     if req not in provisions:
                         self.logger.error('NOT SATISFIED: %s requires %s' % (
                             obj.name, req))
-                        raise Exception('DRC FAIL! %s (required by %s) not '
+                        raise Exception('DRC FAIL! %s (required by %s) in %s not '
                                         'provided by platform or any '
-                                        'peripheral' % (req, obj.name))
+                                        'peripheral' % (req, obj.name, str(req_list)))
         # check for overallocation of resources
         used = []
         for obj in self.periph_objs:
@@ -1642,7 +1642,7 @@ class QuartusBackend(ToolflowBackend):
         self.manufacturer = 'intel'
         self.project_name = 'myproj'
         self.periph_objs = periph_objs
-        self.tcl_cmd = ''
+        self.tcl_cmds = ''
         self.output_dir = os.path.join(self.compile_dir, 'outputs')
         os.makedirs(self.output_dir, exist_ok=True)
         self.bitstream_loc = os.path.join(self.output_dir, 'top.sof')
@@ -1652,7 +1652,20 @@ class QuartusBackend(ToolflowBackend):
         self.name = 'quartus'
         self.npm_sources = []
         ToolflowBackend.__init__(self, plat=plat, compile_dir=compile_dir)
-
+        self.tcl_cmds = {
+            'init'        : '',
+            'create_bd'   : '',
+            'pre_synth'   : '',
+            'synth'       : '',
+            'post_synth'  : '',
+            'pre_impl'    : '',
+            'impl'        : '',
+            'post_impl'   : '',
+            'pre_bitgen'  : '',
+            'bitgen'      : '',
+            'post_bitgen' : '',
+            'promgen'     : '',
+        }
 
     def initialize(self):
         plat = self.plat
@@ -1670,8 +1683,9 @@ class QuartusBackend(ToolflowBackend):
         # Just use project path prefix
         prefix = os.path.join(self.compile_dir, self.project_name)
 
+        self.add_tcl_cmd('load_package flow', stage='init')
         self.add_tcl_cmd(f'cd {prefix}', stage='init')
-        self.add_tcl_cmd(f'project_new {self.project_name}', stage='init')
+        self.add_tcl_cmd(f'project_new {self.project_name} -overwrite', stage='init')
 
         # Set FPGA part
         self.add_tcl_cmd(f'set_global_assignment -name FAMILY "{plat.family}"', stage='init')
@@ -1680,32 +1694,47 @@ class QuartusBackend(ToolflowBackend):
 
         # Output paths
         self.bitstream_loc = os.path.join(self.output_dir, 'top.sof')
-        self.logger.debug(f'Set bitstream output location to: {self.bittstream_loc}')
+        self.logger.debug(f'Set bitstream output location to: {self.bitstream_loc}')
         self.binary_loc = os.path.join(self.output_dir, 'top.rbf')
         self.logger.debug(f'Set rbf output location to: {self.binary_loc}')
 
-        self.add_tcl_cmd(f'set_global_assignment -name OUTPUT_DIRECTORY {self.output_dir}', stage='init')
+        #self.add_tcl_cmd(f'set_global_assignment -name OUTPUT_DIRECTORY {self.output_dir}', stage='init')
         self.logger.debug(f'Top level output directory is: {self.output_dir}')
 
         # Any top-level file setup
         self.add_tcl_cmd(f'set_global_assignment -name TOP_LEVEL_ENTITY top', stage='init')
-        self.add_tcl_cmd('set_global_assignment -name DESIGN_ENTRY "VHDL"', stage='init')
+        #self.add_tcl_cmd('set_global_assignment -name DESIGN_ENTRY "VHDL"', stage='init')
 
     def add_library(self, path):
-        """
+        """ERROR: Illegal assignment: DESIGN_ENTRY. Specify a legal assignment name.
+
+        while executing
+        "set_global_assignment -name DESIGN_ENTRY "VHDL""
+        (file "/data/DesignFiles/de10_test3/gogogo.tcl" line 7)
+
         Add a library at <path>
         """
-        self.add_tcl_cmd('set repos [get_property ip_repo_paths [current_project]]')
-        self.add_tcl_cmd('set_property ip_repo_paths "$repos %s" [current_project]' % path)
-        self.add_tcl_cmd('update_ip_catalog')
+        #self.add_tcl_cmd('set repos [get_property ip_repo_paths [current_project]]')
+        #self.add_tcl_cmd('set_property ip_repo_paths "$repos %s" [current_project]' % path)
+        #self.add_tcl_cmd('update_ip_catalog')
+        """
+        No-op for Quartus ? IP library paths not needed.
+        """
+        self.logger.debug(f'Ignoring IP repo path {path} in Quartus backend')
+        return
 
     def add_ip(self, ip):
         """
         Add an ip core from a library
         """
-        self.add_tcl_cmd('create_ip -name %s -vendor %s -library %s -version %s -module_name %s' % (ip['name'], ip['vendor'], ip['library'], ip['version'], ip['module_name']))
-        if self.template_project is not None:
-            self.add_tcl_cmd('move_files -of_objects [get_reconfig_modules user_top-toolflow] [get_files %s.xci]' % ip['module_name'])
+        #self.add_tcl_cmd('create_ip -name %s -vendor %s -library %s -version %s -module_name %s' % (ip['name'], ip['vendor'], ip['library'], ip['version'], ip['module_name']))
+        #if self.template_project is not None:
+        #    self.add_tcl_cmd('move_files -of_objects [get_reconfig_modules user_top-toolflow] [get_files %s.xci]' % ip['module_name'])
+        """
+        No-op for Quartus ? IP cores must be instantiated manually or via Platform Designer.
+        """
+        self.logger.debug(f'Ignoring IP instantiation of {ip.get("name", "unknown")} in Quartus backend')
+        return
 
     def add_source(self, source, plat):
         """
@@ -1713,6 +1742,8 @@ class QuartusBackend(ToolflowBackend):
         Supports VHDL, Verilog, and SystemVerilog.
         """
         self.logger.debug(f'Adding source file: {source}')
+        print(f"[QUARTUS BACKEND] add_source() called for: {source}")
+
         ext = os.path.splitext(source)[-1].lower()
 
         if ext == '.vhd':
@@ -1734,6 +1765,7 @@ class QuartusBackend(ToolflowBackend):
 
         :param constfile:
         """
+        """
         if constfile.split('.')[-1] == self.const_file_ext:
             self.logger.debug('Adding constraint file: %s' % constfile)
             # Project Mode is enabled
@@ -1751,12 +1783,30 @@ class QuartusBackend(ToolflowBackend):
             self.logger.debug('Ignore constraint file: %s, with wrong file '
                               'extension' % constfile)
 
+        """
+        """
+        Add a constraint file to the Quartus project.
+        Assumes .qsf or .sdc file type.
+        """
+        ext = os.path.splitext(constfile)[-1].lower()
+
+        if ext == '.qsf':
+            self.logger.debug(f'Adding QSF constraint file: {constfile}')
+            self.add_tcl_cmd(f'source "{constfile}"', stage='pre_synth')
+
+        elif ext == '.sdc':
+            self.logger.debug(f'Adding SDC constraint file: {constfile}')
+            self.add_tcl_cmd(f'set_global_assignment -name SDC_FILE "{constfile}"', stage='init')
+
+        else:
+            self.logger.warning(f'Ignoring constraint file with unknown extension: {constfile}')
     def add_tcl_cmd(self, cmd, stage='pre_synth'):
         """
         Add a command to the tcl command list with
         a trailing newline.
         """
         self.logger.debug('Adding tcl command: %s' % cmd)
+        print('Adding tcl command: %s at stage %s' %(cmd, str(stage)))
         self.tcl_cmds[stage] += cmd
         self.tcl_cmds[stage] += '\n'
 
@@ -1831,10 +1881,9 @@ class QuartusBackend(ToolflowBackend):
 
 
     def get_tcl_const(self, const):
-    """
-    Generate Quartus-compatible .qsf-style constraints
-    from a PinConstraint object (location and IO standard only).
-    """
+    
+    #Generate Quartus-compatible .qsf-style constraints
+    #from a PinConstraint object (location and IO standard only).
         user_const = ''
         if isinstance(const, castro.PinConstraint):
             self.logger.debug('Processing PinConstraint: %s -> %s' % (const.portname, const.symbolic_name))
@@ -1937,7 +1986,7 @@ class QuartusBackend(ToolflowBackend):
         @staticmethod
         def format_multi_cycle_const(c):
             #return 'set_multicycle_path -%s -from [%s] -to [%s] %d\n' % (
-                c.multicycletype, c.sourcepath, c.destpath, c.multicycledelay)
+            #    c.multicycletype, c.sourcepath, c.destpath, c.multicycledelay)
             return ' '
 
         @staticmethod

@@ -33,9 +33,9 @@ if __name__ == '__main__':
     parser.add_argument("--software", dest="software", action='store_true',
                     default=False, help="Run software compilation")
     parser.add_argument("--vitis", dest="vitis", action='store_true',
-                    default=False, help="[EXPERIMENTAL] Run quartus to generate rbf file")
-    parser.add_argument("--quartus", dest="quartus", action='store_true',
                     default=False, help="[EXPERIMENTAL] Run xsct (Vitis) to generate dtbo")
+    parser.add_argument("--quartus", dest="quartus", action='store_true',
+                    default=False, help="[EXPERIMENTAL] quartus to generate rbf file")
     parser.add_argument("--xsa", dest="xsa", type=str, default='',
                     help="location of xsa file, uses backend generated if ran with backend option")
     parser.add_argument("--be", dest="be", type=str, default='vivado',
@@ -253,8 +253,8 @@ if __name__ == '__main__':
             backend.compile()
         # Default to vivado for compile
         elif opts.be == 'quartus':
-            platform.backend.target = 'quartus'
-            backend = toolflow.QuartusBackend(plat=platform, compile_dir=tf.compile_dir)
+            #platform.backend.target = 'quartus'
+            backend = toolflow.QuartusBackend(plat=platform, compile_dir=tf.compile_dir, periph_objs=tf.periph_objs)
             backend.import_from_castro(backend.compile_dir + '/castro.yml')
             backend.initialize()
             backend.compile(cores=opts.jobs, plat=platform)

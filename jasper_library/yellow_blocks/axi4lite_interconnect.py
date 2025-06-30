@@ -1,4 +1,5 @@
 import math
+import os
 from .yellow_block import YellowBlock
 from .yellow_block_typecodes import *
 
@@ -98,8 +99,14 @@ class axi4lite_interconnect(YellowBlock):
         print('=====================')
         tcl_cmds = {}
         tcl_cmds['pre_synth'] = []
-        tcl_cmds['pre_synth'] += ['import_files {%s/axi4_lite/axi4lite_slave_logic.vhd %s/axi4_lite/axi4lite_pkg.vhd}' %(self.hdl_root, self.hdl_root)]
-        tcl_cmds['pre_synth'] += ['update_compile_order -fileset sources_1']
+        if self.platform.backend_target == 'vivado':
+            tcl_cmds['pre_synth'] += ['import_files {%s/axi4_lite/axi4lite_slave_logic.vhd %s/axi4_lite/axi4lite_pkg.vhd}' %(self.hdl_root, self.hdl_root)]
+            tcl_cmds['pre_synth'] += ['update_compile_order -fileset sources_1']
+        else:
+            for filename in ['axi4lite_slave_logic.vhd', 'axi4lite_pkg.vhd']:
+                full_path = os.path.join(self.hdl_root, 'axi4_lite', filename)
+                tcl_cmds['pre_synth'].append(f'set_global_assignment -name VHDL_FILE "{full_path}"')
+
         return tcl_cmds
 
     def add_build_dir_source(self):

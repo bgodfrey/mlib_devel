@@ -65,7 +65,7 @@ for i =1:length(gateway_ins)
     gw = gateway_ins{i};
     gw_name = get_param(gw, 'Name');
     % Set number of bits for gateway in block
-    set_param(gw, 'n_bits', num2str(bitwidth));
+    %set_param(gw, 'n_bits', num2str(bitwidth));
     if regexp(gw_name, 'dout_o$')
         set_param(gw, 'Name', clear_name([gcb, '_dout_o']));
     else 
