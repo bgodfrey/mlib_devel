@@ -17,7 +17,13 @@ provides:
 pins:
   fpga_clk1_50:
     io_std: "3.3-V LVTTL"
-    loc: [PIN_V11, PIN_Y13, PIN_E11]
+    loc: PIN_V11
+  fpga_clk2_50:
+    io_std: "3.3-V LVTTL"
+    loc: PIN_Y13
+  fpga_clk3_50:
+    io_std: "3.3-V LVTTL"
+    loc: PIN_E11
   led:
     io_std: "3.3-V LVTTL"
     loc: [PIN_AA23, PIN_Y16, PIN_AE26, PIN_AF26, PIN_V15, PIN_V16, PIN_AA24, PIN_W15]

@@ -51,14 +51,16 @@ class xsg(YellowBlock):
             self.provides.append('adc_clk_sel')            
         else:
             self.requires.append(self.clk_src)
-            self.requires.append(self.clk_src+'90')
-            self.requires.append(self.clk_src+'180')
-            self.requires.append(self.clk_src+'270')
-
             self.provides.append('user_clk')
-            self.provides.append('user_clk90')
-            self.provides.append('user_clk180')
-            self.provides.append('user_clk270')
+
+            if self.platform.manufacturer.lower() == 'xilinx':
+                self.requires.append(self.clk_src+'90')
+                self.requires.append(self.clk_src+'180')
+                self.requires.append(self.clk_src+'270')
+
+                self.provides.append('user_clk90')
+                self.provides.append('user_clk180')
+                self.provides.append('user_clk270')
 
     def gen_children(self):
         this_block_params = self.blk.copy()
@@ -76,7 +78,7 @@ class xsg(YellowBlock):
             else:
                 top.assign_signal('adc_clk_sel', '1\'b0')	      
 	              
-        else:
+        elif self.platform.manufacturer.lower() == 'xilinx':
             top.add_signal('sys_clk', attributes={'keep': '"true"'})
 
             top.add_signal('user_clk', attributes={'keep': '"true"'})
@@ -90,3 +92,8 @@ class xsg(YellowBlock):
             top.assign_signal('user_clk270',self.clk_src+'270')
 
             top.add_signal('sys_clk', attributes={'keep': '"true"'})
+        else:
+            # Intel / Quartus
+            top.add_signal('sys_clk', attributes={'keep': '"true"'})
+            top.add_signal('user_clk', attributes={'keep': '"true"'})
+            top.assign_signal('user_clk', self.clk_src)

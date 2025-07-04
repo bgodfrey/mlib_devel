@@ -192,7 +192,7 @@ if __name__ == '__main__':
     if opts.sysgen != '':
         os.environ['SYSGEN_SCRIPT'] = opts.sysgen
 
-    if not os.path.isfile(os.environ['SYSGEN_SCRIPT']):
+    if opts.be in ['vivado', 'ise'] and not os.path.isfile(os.environ.get('SYSGEN_SCRIPT', '')):
         raise RuntimeError('Could not find sysgen startup script: '
                         '%s' % os.environ['SYSGEN_SCRIPT'])
 
@@ -253,7 +253,7 @@ if __name__ == '__main__':
             backend.compile()
         # Default to vivado for compile
         elif opts.be == 'quartus':
-            #platform.backend.target = 'quartus'
+            platform.backend_target = 'quartus'
             backend = toolflow.QuartusBackend(plat=platform, compile_dir=tf.compile_dir, periph_objs=tf.periph_objs)
             backend.import_from_castro(backend.compile_dir + '/castro.yml')
             backend.initialize()

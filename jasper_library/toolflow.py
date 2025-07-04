@@ -317,6 +317,10 @@ class Toolflow(object):
             for req_list in [obj.requires, obj.exc_requires]:
                 for req in req_list:
                     self.logger.debug('%s requires %s' % (obj.name, req))
+                    # Skip known Vivado-only phase clocks when using Quartus
+                    if req in ['fpga_clk1_5090', 'fpga_clk1_50180', 'fpga_clk1_50270'] and self.plat.backend_target == 'quartus':
+                        self.logger.warning(f"Skipping DRC check for {req} on Quartus backend")
+                        continue
                     if req not in provisions:
                         self.logger.error('NOT SATISFIED: %s requires %s' % (
                             obj.name, req))
@@ -974,6 +978,7 @@ class Toolflow(object):
         try:
             # Xml2VhdlGenerate takes arguments as attributes of an args class
             args = helper.arguments.Arguments()
+            args.backend = 'quartus' if self.plat.manufacturer.lower() == 'intel' else 'vivado'
             # see the help of the xml2vhdl.py script
             args.input_folder  = [self.xml_source_dir] # Needs to be a list (can be multiple directories)
             args.vhdl_output   = self.hdl_output_dir
@@ -1452,171 +1457,6 @@ class SimulinkFrontend(ToolflowFrontend):
         os.system(term_cmd)
 
 
-class VitisBackend(ToolflowBackend):
-    """
-    Incantations of a Vitis flow
-
-    Uses the hardware platform (.xsa) exported from Vivado to generate a software platform. Here
-    we start by building the device tree
-    """
-    def __init__(self, xsa, plat=None, compile_dir='/tmp', periph_objs=None):
-        """
-        """
-        self.logger = logging.getLogger('jasper.toolflow.backend')
-        self.compile_dir = compile_dir
-        self.jdts_project_name = 'jdts'
-        self.jdtspath = os.path.join(self.compile_dir, self.jdts_project_name)
-        self.dtsiname = 'jasper.dtsi'
-        self.dtsi_loc = os.path.join(self.jdtspath, self.dtsiname)
-        self.periph_objs = periph_objs
-
-        self.xsa_loc = xsa
-        try:
-            os.path.getsize(self.xsa_loc)
-        except OSError as e:
-            self.logger.error('.xsa file does not exist or was not specified')
-            raise e
-
-        # device tree gen requires this new env requirement when generating xilinx device tree products
-        # if continue to only manager our own (as in the case of the rfdc) we can omit this requirment.
-        # The goal however is to get to this point where the full xilinx and jasper dt are combined.
-        # The potential complication here is that the user needs to make sure to checkout the branch
-        # version of the xlnx device tree matching the version of vivado/xsct that is being used.
-        self.xlnx_dt_path = os.getenv('XLNX_DT_REPO_PATH')
-        if self.xlnx_dt_path is None:
-            raise RuntimeError('The enviornment variable `XLNX_DT_REPO_PATH` is not on the path.')
-
-        self.name = 'vitis'
-        ToolflowBackend.__init__(self, plat=plat, compile_dir=compile_dir)
-
-
-    def compile(self):
-        """
-        This will break plain ole fpga's (non xlnx zynq soc's). This is a temporary implementation
-        placeholder. Will be moving to seperate back end class.
-
-        The general idea here is to run Vitis (xsct) with the platform hardware (.xsa) to generate
-        supporting software products to create a device tree overlay. The following:
-          1. makes a `jdts` dir in the `compile_dir` to hold the build products
-          2. create an empty `xsct_gogogo.tcl` (similar to the Vivado jasper flow) so that:
-            a. can build xilinx device tree (requiring the xlnx-device-tree repo)
-            b. allow each peripheral device (yellow block) to also add xsct commands to
-               generate whatever they need. In the case of the `rfdc` it is not explicitly
-               added to the MPSoC and there is no mmap path managed by Vivado. This excludes
-               the rfdc from being auto-magically included as part of the exported drivers
-               from the xlnx device tree driver information. However, the IP and its
-               configuration is still present within the `.xsa` hardware project and we can
-               instead manually build the device tree to match what xrfdc driver expects.
-          3. run `xsct` against the generated `xsct_gogogo.tcl` file
-          4. take all of the products generated and build one complete `jasper.dtsi` device
-             tree overaly description that is later compiled with `dtc` producing a compatible
-             overlay.
-        """
-        xsct_cmds = []
-
-        self.logger.info('Building xsct script')
-        xsct_cmds.append('puts "starting jasper device tree generation"')
-        # add directory to create dt build directory
-        xsct_cmds.append('set jdts_dir {:s}'.format(os.path.join(self.jdtspath, 'xil')))
-        xsct_cmds.append('file mkdir $jdts_dir')
-        xsct_cmds.append('hsi::open_hw_design {:s}'.format(self.xsa_loc))
-        #tclpath = os.path.join(os.getenv('MLIB_DEVEL_PATH'), os.path.join('jasper_library', 'hsi_plnx'))
-        #xsct_cmds.append('set tclpath "{:s}"'format(tclpath))
-
-        # Use xsct (vitis) to generate software products for the platform/hardware in our projects
-        # board design. Until the device tree overlay is more fully accepted in the toolflow we do not
-        # even need to generate the xilinx products
-        xsct_cmds.append('')
-        xsct_cmds.append('# generate xilinx device tree products from xsa/block design')
-        xsct_cmds.append('hsi::set_repo_path {:s}'.format(self.xlnx_dt_path))
-        xsct_cmds.append('set processor [hsi::get_cells * -filter {IP_TYPE==PROCESSOR}]')
-        xsct_cmds.append('set processor [lindex $processor 0]')
-        xsct_cmds.append('hsi::create_sw_design device-tree -os device_tree -proc $processor')
-        xsct_cmds.append('hsi::set_property CONFIG.dt_overlay true [hsi::get_os]')
-        xsct_cmds.append('hsi::generate_target -dir $jdts_dir')
-        #################################################################################
-
-        # Allow jasper blocks to generate xsct tcl to create any needed products
-        for p in self.periph_objs:
-            cmds = p.gen_xsct_tcl_cmds(jdts_dir=self.jdtspath)
-            if cmds is not None:
-                for c in cmds:
-                    xsct_cmds.append(c)
-
-        xsct_cmds.append('hsi::close_hw_design [hsi::current_hw_design]')
-
-        xc = '\n'.join(xsct_cmds)
-        xsct_tcl = os.path.join(self.compile_dir, 'xsct_gogogo.tcl')
-        helpers.write_file(xsct_tcl, xc)
-
-        # TODO removing `XILINX_PATH` here is a hack for now to work updating Vitis 2020.2 to Vitis 2021.1
-        # for newer versions of the tools `XILINX_PATH` is an env var that Xilinx uses for their Vitis tool
-        # and our library env var clobbers it causing xsct to fail when starting
-        del os.environ['XILINX_PATH']
-        rv = os.system('xsct {:s}'.format(xsct_tcl))
-        if rv:
-            raise Exception('xsct (Vitis) failed!')
-
-        """
-        With software products generated from everything in our hardware platform we can Now make another pass
-        to piece results together. In this case, build a dtsi incorporating xlnx and jasper generated products
-        """
-        self.logger.info('Assembling jasper dt node')
-        # assemble dt node
-        dtstr = []
-        dtstr.append('/* AUTOMATICALLY GENERATED */\n\n')
-        dtstr.append('/dts-v1/;')
-        dtstr.append('/plugin/;')
-        dtstr.append('')
-
-        # ideally, we would also include the xilinx provided dtsi and then include the casper
-        # built fragments, this allows to easily build a complete dto
-        # dtstr.append('/include/ "xil/pl.dtsi"')
-
-        # ideally,this would be replaced with direct access to mmap addrs, if at all possible
-        # this is also dependent on `core_info.tab` not changing names
-        coreinfo = os.path.join(self.compile_dir, "core_info.tab")
-        fcsv = open(coreinfo, 'r')
-        fields = ['core', 'rw', 'baseaddr', 'size']
-        rdr = csv.DictReader(fcsv, fieldnames=fields, delimiter=" ", skipinitialspace=True)
-
-        mmap = {}
-        for row in rdr:
-            c = row.pop('core')
-            mmap[c] = row
-        fcsv.close()
-
-        # TODO: pass additional build information for dt generation methods. The dt overlay fragment
-        # syntax is not required to be
-        #   `fragment<#>@<address>`
-        # the only thing that is required is the `__overlay__` node directive. This makes augmenting
-        # xilinx dt generation to include a jasper one straightforward because we do not need to
-        # parse that tree to know the number of `fragment<#>@<address>`. So, we can start with just a
-        # jasper node `jasper<#>@<address>` and when this is included as part of the high-level dtsi
-        # the jasper nodes will co-exist with xlnx created fragment nodes.
-        # To do this requires that we manage the assembly process needing to extend each peripherals
-        # `gen_dt_node()` method to include the ability to pass node information in the dt generation
-        # process (or at least use dt aliases so the nodes can be added just by their name)
-        for p in self.periph_objs:
-            if p.name in mmap:
-                dt = p.gen_dt_node(mmap_info=mmap[p.name], jdts_dir=self.jdtspath)
-                if dt is not None:
-                    dtstr.append('/include/ "{:s}/{:s}-overlay-fragment.dtsi"'.format(p.name, p.name))
-
-        dtstr.append('/{')
-        dtstr.append('};')
-
-        dtsi = '\n'.join(dtstr)
-        helpers.write_file(self.dtsi_loc, dtsi)
-
-
-    def mkdtbo(self, dtsi_file, dtbo_file):
-        """
-        """
-        rv = os.system('dtc -I dts {:s} -O dtb -b 0 -@ -o {:s}'.format(dtsi_file, dtbo_file))
-        if rv:
-            raise Exception('dtc failed!')
-
 class QuartusBackend(ToolflowBackend):
     """
 
@@ -1666,6 +1506,8 @@ class QuartusBackend(ToolflowBackend):
             'post_bitgen' : '',
             'promgen'     : '',
         }
+        self.add_source(self.output_dir, self.plat)
+        # Link the platform to this backend so yellow blocks know
 
     def initialize(self):
         plat = self.plat
@@ -1684,6 +1526,7 @@ class QuartusBackend(ToolflowBackend):
         prefix = os.path.join(self.compile_dir, self.project_name)
 
         self.add_tcl_cmd('load_package flow', stage='init')
+        os.makedirs(os.path.join(self.compile_dir, self.project_name), exist_ok=True)
         self.add_tcl_cmd(f'cd {prefix}', stage='init')
         self.add_tcl_cmd(f'project_new {self.project_name} -overwrite', stage='init')
 
@@ -1738,22 +1581,40 @@ class QuartusBackend(ToolflowBackend):
 
     def add_source(self, source, plat):
         """
-        Add HDL source file to Quartus project via set_global_assignment.
-        Supports VHDL, Verilog, and SystemVerilog.
+        Add HDL source file(s) to Quartus project via set_global_assignment.
+        Supports individual files or directories containing VHDL, Verilog, and SystemVerilog.
         """
-        self.logger.debug(f'Adding source file: {source}')
+        self.logger.debug(f'Adding source: {source}')
         print(f"[QUARTUS BACKEND] add_source() called for: {source}")
-
-        ext = os.path.splitext(source)[-1].lower()
-
-        if ext == '.vhd':
-            self.add_tcl_cmd(f'set_global_assignment -name VHDL_FILE "{source}"')
-        elif ext == '.v':
-            self.add_tcl_cmd(f'set_global_assignment -name VERILOG_FILE "{source}"')
-        elif ext == '.sv':
-            self.add_tcl_cmd(f'set_global_assignment -name SYSTEMVERILOG_FILE "{source}"')
+        print("[DEBUG] HDL output dir contents:")
+        for f in os.listdir(self.output_dir):
+            print("    -", f)
+        
+        if os.path.isdir(source):
+            # Source is a directory ? add all supported HDL files
+            for fname in sorted(os.listdir(source)):
+                full_path = os.path.join(source, fname)
+                if fname.lower().endswith('.vhd') or fname.lower().endswith('.vhdl'):
+                    self.add_tcl_cmd(f'set_global_assignment -name VHDL_FILE "{full_path}"')
+                elif fname.lower().endswith('.v'):
+                    self.add_tcl_cmd(f'set_global_assignment -name VERILOG_FILE "{full_path}"')
+                elif fname.lower().endswith('.sv'):
+                    self.add_tcl_cmd(f'set_global_assignment -name SYSTEMVERILOG_FILE "{full_path}"')
+                else:
+                    self.logger.debug(f'Skipping non-HDL file: {fname}')
+        elif os.path.isfile(source):
+            # Source is a single file
+            ext = os.path.splitext(source)[-1].lower()
+            if ext == '.vhd' or ext == '.vhdl':
+                self.add_tcl_cmd(f'set_global_assignment -name VHDL_FILE "{source}"')
+            elif ext == '.v':
+                self.add_tcl_cmd(f'set_global_assignment -name VERILOG_FILE "{source}"')
+            elif ext == '.sv':
+                self.add_tcl_cmd(f'set_global_assignment -name SYSTEMVERILOG_FILE "{source}"')
+            else:
+                self.logger.warning(f"Unknown or unsupported source type: {source}")
         else:
-            self.logger.warning(f"Unknown or unsupported source type: {source}")
+            self.logger.error(f"add_source called with unknown path: {source}")
 
     def add_const_file(self, constfile):
         """
@@ -2068,6 +1929,171 @@ class QuartusBackend(ToolflowBackend):
         self.logger.info('Finished writing constraints file: %s' % constfile)
         self.add_const_file(constfile)
   
+class VitisBackend(ToolflowBackend):
+    """
+    Incantations of a Vitis flow
+
+    Uses the hardware platform (.xsa) exported from Vivado to generate a software platform. Here
+    we start by building the device tree
+    """
+    def __init__(self, xsa, plat=None, compile_dir='/tmp', periph_objs=None):
+        """
+        """
+        self.logger = logging.getLogger('jasper.toolflow.backend')
+        self.compile_dir = compile_dir
+        self.jdts_project_name = 'jdts'
+        self.jdtspath = os.path.join(self.compile_dir, self.jdts_project_name)
+        self.dtsiname = 'jasper.dtsi'
+        self.dtsi_loc = os.path.join(self.jdtspath, self.dtsiname)
+        self.periph_objs = periph_objs
+
+        self.xsa_loc = xsa
+        try:
+            os.path.getsize(self.xsa_loc)
+        except OSError as e:
+            self.logger.error('.xsa file does not exist or was not specified')
+            raise e
+
+        # device tree gen requires this new env requirement when generating xilinx device tree products
+        # if continue to only manager our own (as in the case of the rfdc) we can omit this requirment.
+        # The goal however is to get to this point where the full xilinx and jasper dt are combined.
+        # The potential complication here is that the user needs to make sure to checkout the branch
+        # version of the xlnx device tree matching the version of vivado/xsct that is being used.
+        self.xlnx_dt_path = os.getenv('XLNX_DT_REPO_PATH')
+        if self.xlnx_dt_path is None:
+            raise RuntimeError('The enviornment variable `XLNX_DT_REPO_PATH` is not on the path.')
+
+        self.name = 'vitis'
+        ToolflowBackend.__init__(self, plat=plat, compile_dir=compile_dir)
+
+
+    def compile(self):
+        """
+        This will break plain ole fpga's (non xlnx zynq soc's). This is a temporary implementation
+        placeholder. Will be moving to seperate back end class.
+
+        The general idea here is to run Vitis (xsct) with the platform hardware (.xsa) to generate
+        supporting software products to create a device tree overlay. The following:
+          1. makes a `jdts` dir in the `compile_dir` to hold the build products
+          2. create an empty `xsct_gogogo.tcl` (similar to the Vivado jasper flow) so that:
+            a. can build xilinx device tree (requiring the xlnx-device-tree repo)
+            b. allow each peripheral device (yellow block) to also add xsct commands to
+               generate whatever they need. In the case of the `rfdc` it is not explicitly
+               added to the MPSoC and there is no mmap path managed by Vivado. This excludes
+               the rfdc from being auto-magically included as part of the exported drivers
+               from the xlnx device tree driver information. However, the IP and its
+               configuration is still present within the `.xsa` hardware project and we can
+               instead manually build the device tree to match what xrfdc driver expects.
+          3. run `xsct` against the generated `xsct_gogogo.tcl` file
+          4. take all of the products generated and build one complete `jasper.dtsi` device
+             tree overaly description that is later compiled with `dtc` producing a compatible
+             overlay.
+        """
+        xsct_cmds = []
+
+        self.logger.info('Building xsct script')
+        xsct_cmds.append('puts "starting jasper device tree generation"')
+        # add directory to create dt build directory
+        xsct_cmds.append('set jdts_dir {:s}'.format(os.path.join(self.jdtspath, 'xil')))
+        xsct_cmds.append('file mkdir $jdts_dir')
+        xsct_cmds.append('hsi::open_hw_design {:s}'.format(self.xsa_loc))
+        #tclpath = os.path.join(os.getenv('MLIB_DEVEL_PATH'), os.path.join('jasper_library', 'hsi_plnx'))
+        #xsct_cmds.append('set tclpath "{:s}"'format(tclpath))
+
+        # Use xsct (vitis) to generate software products for the platform/hardware in our projects
+        # board design. Until the device tree overlay is more fully accepted in the toolflow we do not
+        # even need to generate the xilinx products
+        xsct_cmds.append('')
+        xsct_cmds.append('# generate xilinx device tree products from xsa/block design')
+        xsct_cmds.append('hsi::set_repo_path {:s}'.format(self.xlnx_dt_path))
+        xsct_cmds.append('set processor [hsi::get_cells * -filter {IP_TYPE==PROCESSOR}]')
+        xsct_cmds.append('set processor [lindex $processor 0]')
+        xsct_cmds.append('hsi::create_sw_design device-tree -os device_tree -proc $processor')
+        xsct_cmds.append('hsi::set_property CONFIG.dt_overlay true [hsi::get_os]')
+        xsct_cmds.append('hsi::generate_target -dir $jdts_dir')
+        #################################################################################
+
+        # Allow jasper blocks to generate xsct tcl to create any needed products
+        for p in self.periph_objs:
+            cmds = p.gen_xsct_tcl_cmds(jdts_dir=self.jdtspath)
+            if cmds is not None:
+                for c in cmds:
+                    xsct_cmds.append(c)
+
+        xsct_cmds.append('hsi::close_hw_design [hsi::current_hw_design]')
+
+        xc = '\n'.join(xsct_cmds)
+        xsct_tcl = os.path.join(self.compile_dir, 'xsct_gogogo.tcl')
+        helpers.write_file(xsct_tcl, xc)
+
+        # TODO removing `XILINX_PATH` here is a hack for now to work updating Vitis 2020.2 to Vitis 2021.1
+        # for newer versions of the tools `XILINX_PATH` is an env var that Xilinx uses for their Vitis tool
+        # and our library env var clobbers it causing xsct to fail when starting
+        del os.environ['XILINX_PATH']
+        rv = os.system('xsct {:s}'.format(xsct_tcl))
+        if rv:
+            raise Exception('xsct (Vitis) failed!')
+
+        """
+        With software products generated from everything in our hardware platform we can Now make another pass
+        to piece results together. In this case, build a dtsi incorporating xlnx and jasper generated products
+        """
+        self.logger.info('Assembling jasper dt node')
+        # assemble dt node
+        dtstr = []
+        dtstr.append('/* AUTOMATICALLY GENERATED */\n\n')
+        dtstr.append('/dts-v1/;')
+        dtstr.append('/plugin/;')
+        dtstr.append('')
+
+        # ideally, we would also include the xilinx provided dtsi and then include the casper
+        # built fragments, this allows to easily build a complete dto
+        # dtstr.append('/include/ "xil/pl.dtsi"')
+
+        # ideally,this would be replaced with direct access to mmap addrs, if at all possible
+        # this is also dependent on `core_info.tab` not changing names
+        coreinfo = os.path.join(self.compile_dir, "core_info.tab")
+        fcsv = open(coreinfo, 'r')
+        fields = ['core', 'rw', 'baseaddr', 'size']
+        rdr = csv.DictReader(fcsv, fieldnames=fields, delimiter=" ", skipinitialspace=True)
+
+        mmap = {}
+        for row in rdr:
+            c = row.pop('core')
+            mmap[c] = row
+        fcsv.close()
+
+        # TODO: pass additional build information for dt generation methods. The dt overlay fragment
+        # syntax is not required to be
+        #   `fragment<#>@<address>`
+        # the only thing that is required is the `__overlay__` node directive. This makes augmenting
+        # xilinx dt generation to include a jasper one straightforward because we do not need to
+        # parse that tree to know the number of `fragment<#>@<address>`. So, we can start with just a
+        # jasper node `jasper<#>@<address>` and when this is included as part of the high-level dtsi
+        # the jasper nodes will co-exist with xlnx created fragment nodes.
+        # To do this requires that we manage the assembly process needing to extend each peripherals
+        # `gen_dt_node()` method to include the ability to pass node information in the dt generation
+        # process (or at least use dt aliases so the nodes can be added just by their name)
+        for p in self.periph_objs:
+            if p.name in mmap:
+                dt = p.gen_dt_node(mmap_info=mmap[p.name], jdts_dir=self.jdtspath)
+                if dt is not None:
+                    dtstr.append('/include/ "{:s}/{:s}-overlay-fragment.dtsi"'.format(p.name, p.name))
+
+        dtstr.append('/{')
+        dtstr.append('};')
+
+        dtsi = '\n'.join(dtstr)
+        helpers.write_file(self.dtsi_loc, dtsi)
+
+
+    def mkdtbo(self, dtsi_file, dtbo_file):
+        """
+        """
+        rv = os.system('dtc -I dts {:s} -O dtb -b 0 -@ -o {:s}'.format(dtsi_file, dtbo_file))
+        if rv:
+            raise Exception('dtc failed!')
+
 
 class VivadoBackend(ToolflowBackend):
     """
@@ -2264,15 +2290,19 @@ proc puts_red {s} {
 
     def add_library(self, path):
         """
-        No-op for Quartus — library repo paths are not needed.
+        Add a library at <path>
         """
-        self.logger.debug(f'Ignoring IP repo path {path} in Quartus backend')
+        self.add_tcl_cmd('set repos [get_property ip_repo_paths [current_project]]')
+        self.add_tcl_cmd('set_property ip_repo_paths "$repos %s" [current_project]' % path)
+        self.add_tcl_cmd('update_ip_catalog')
 
     def add_ip(self, ip):
         """
-        No-op for Quartus — IP cores must be instantiated manually or via Platform Designer.
+        Add an ip core from a library
         """
-        self.logger.debug(f'Ignoring IP instantiation of {ip.get("name", "unknown")} in Quartus backend')
+        self.add_tcl_cmd('create_ip -name %s -vendor %s -library %s -version %s -module_name %s' % (ip['name'], ip['vendor'], ip['library'], ip['version'], ip['module_name']))
+        if self.template_project is not None:
+            self.add_tcl_cmd('move_files -of_objects [get_reconfig_modules user_top-toolflow] [get_files %s.xci]' % ip['module_name'])
 
     def add_source(self, source, plat):
         """

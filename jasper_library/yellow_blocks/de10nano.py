@@ -1,11 +1,10 @@
 from .yellow_block import YellowBlock
 from clk_factors import clk_factors
 from constraints import ClockConstraint, ClockGroupConstraint, PortConstraint, RawConstraint
-
+import os
 
 class de10nano(YellowBlock):
     def initialize(self):
-
         self.name = 'de10nano'
         self.fpga = '5CSEBA6U23I7'
         self.family = 'Cyclone V'
@@ -19,13 +18,15 @@ class de10nano(YellowBlock):
         self.provides.append('sys_rst')
 
         self.provides.append('fpga_clk1_50')
-        self.provides.append('fpga_clk1_5090')
-        self.provides.append('fpga_clk1_50180')
-        self.provides.append('fpga_clk1_50270')
+        self.provides.append('fpga_clk2_50')
+        self.provides.append('fpga_clk3_50')
+        self.add_source('utils/cdc_synchroniser.vhd')
 
     def modify_top(self, top):
+        top.add_port('fpga_clk1_50', dir='in', width=1)
         top.assign_signal('sys_clk', 'sys_clk')
         top.assign_signal('sys_rst', 'sys_rst')
+        top.assign_signal('user_clk', 'fpga_clk1_50')
 
     def gen_children(self):
         
@@ -35,11 +36,17 @@ class de10nano(YellowBlock):
     def gen_constraints(self):
         cons = []
         cons.append(ClockConstraint('fpga_clk1_50', 'fpga_clk1_50', period=self.T_pl_clk_ns, port_en=True, virtual_en=False))
+        cons.append(ClockConstraint('fpga_clk1_50', 'fpga_clk1_50', period=self.T_pl_clk_ns, port_en=True, virtual_en=False))
+        cons.append(ClockConstraint('fpga_clk1_50', 'fpga_clk1_50', period=self.T_pl_clk_ns, port_en=True, virtual_en=False))
+
         #cons.append(ClockConstraint('FPGA_CLK1_5090', 'sys_clk', period=self.T_pl_clk_ns, port_en=False, virtual_en=True))
         #cons.append(ClockConstraint('FPGA_CLK1_50180', 'sys_clk', period=self.T_pl_clk_ns, port_en=False, virtual_en=True))
         #cons.append(ClockConstraint('FPGA_CLK1_50270', 'sys_clk', period=self.T_pl_clk_ns, port_en=False, virtual_en=True))
         #cons.append(PortConstraint('fpga_clk1_50', 'fpga_clk1_50', iogroup_index=[0], port_index=[0]))
         cons.append(PortConstraint('fpga_clk1_50', 'fpga_clk1_50'))
+        cons.append(PortConstraint('fpga_clk2_50', 'fpga_clk2_50'))
+        cons.append(PortConstraint('fpga_clk3_50', 'fpga_clk3_50'))
+
         return cons
 
 
