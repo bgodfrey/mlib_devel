@@ -1361,6 +1361,38 @@ class VitisBackend(ToolflowBackend):
         self.name = 'vitis'
         ToolflowBackend.__init__(self, plat=plat, compile_dir=compile_dir)
 
+    def _gen_dt_tcl_cmds(self, jdts_dir_var='$jdts_dir'):
+        """
+        Generate XSCT Tcl commands for device tree generation.
+
+        Uses SDTGen by default for newer tool versions.
+        Falls back to legacy HSI flow if explicitly requested.
+        """
+        cmds = []
+        use_sdtgen = True
+
+        # Optional env override for debugging / fallback
+        if os.getenv('JASPER_USE_LEGACY_HSI_DT', '').lower() in ('1', 'true', 'yes'):
+            use_sdtgen = False
+
+        cmds.append('')
+        cmds.append('# generate xilinx device tree products from xsa/block design')
+
+        if use_sdtgen:
+            cmds.append('set xsa "{:s}"'.format(self.xsa_loc))
+            cmds.append('set jdts_dir {:s}'.format(jdts_dir_var) if jdts_dir_var != '$jdts_dir' else '# jdts_dir already set')
+            cmds.append('set ::env(CUSTOM_SDT_REPO) "{:s}"'.format(self.xlnx_dt_path))
+            cmds.append('set_dt_param -xsa $xsa -dir $jdts_dir')
+            cmds.append('generate_sdt')
+        else:
+            cmds.append('hsi::set_repo_path "{:s}"'.format(self.xlnx_dt_path))
+            cmds.append('set processor [hsi::get_cells * -filter {IP_TYPE==PROCESSOR}]')
+            cmds.append('set processor [lindex $processor 0]')
+            cmds.append('hsi::create_sw_design device-tree -os device_tree -proc $processor')
+            cmds.append('hsi::set_property CONFIG.dt_overlay true [hsi::get_os]')
+            cmds.append('hsi::generate_target -dir $jdts_dir')
+
+        return cmds
 
     def compile(self):
         """
@@ -1398,6 +1430,7 @@ class VitisBackend(ToolflowBackend):
         # Use xsct (vitis) to generate software products for the platform/hardware in our projects
         # board design. Until the device tree overlay is more fully accepted in the toolflow we do not
         # even need to generate the xilinx products
+        """
         xsct_cmds.append('')
         xsct_cmds.append('# generate xilinx device tree products from xsa/block design')
         xsct_cmds.append('hsi::set_repo_path {:s}'.format(self.xlnx_dt_path))
@@ -1406,6 +1439,8 @@ class VitisBackend(ToolflowBackend):
         xsct_cmds.append('hsi::create_sw_design device-tree -os device_tree -proc $processor')
         xsct_cmds.append('hsi::set_property CONFIG.dt_overlay true [hsi::get_os]')
         xsct_cmds.append('hsi::generate_target -dir $jdts_dir')
+        """
+        xsct_cmds.extend(self._gen_dt_tcl_cmds())
         #################################################################################
 
         # Allow jasper blocks to generate xsct tcl to create any needed products
@@ -1424,10 +1459,18 @@ class VitisBackend(ToolflowBackend):
         # TODO removing `XILINX_PATH` here is a hack for now to work updating Vitis 2020.2 to Vitis 2021.1
         # for newer versions of the tools `XILINX_PATH` is an env var that Xilinx uses for their Vitis tool
         # and our library env var clobbers it causing xsct to fail when starting
-        del os.environ['XILINX_PATH']
-        rv = os.system('xsct {:s}'.format(xsct_tcl))
+        #rv = os.system('xsct {:s}'.format(xsct_tcl))
+        xilinx_path = os.environ.get('XILINX_PATH')
+        if not xilinx_path:
+            raise RuntimeError('XILINX_PATH is not set')
+
+        sdtgen_bin = os.path.join(xilinx_path, 'Vitis', 'bin', 'sdtgen')
+        rv = os.system('{:s} {:s}'.format(sdtgen_bin, xsct_tcl))
         if rv:
-            raise Exception('xsct (Vitis) failed!')
+            raise Exception('sdtgen failed!')
+            #raise Exception('xsct (Vitis) failed!')
+
+        #del os.environ['XILINX_PATH']
 
         """
         With software products generated from everything in our hardware platform we can Now make another pass

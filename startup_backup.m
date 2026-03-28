@@ -5,6 +5,46 @@ warning off Simulink:Engine:SaveWithDisabledLinks_Warning
 warning off Simulink:Commands:LoadMdlParameterizedLink
 
 jasper_backend = getenv('JASPER_BACKEND');
+unsetenv('PYTHONHOME');
+unsetenv('PYTHONPATH');
+
+%python_exe = getenv('CASPER_PYTHON_VENV_ON_START');
+python_exe = getenv('CASPER_PYTHON_EXE');
+fprintf('CASPER_PYTHON_EXE = %s\n', getenv('CASPER_PYTHON_EXE'));
+fprintf('PYTHONHOME        = %s\n', getenv('PYTHONHOME'));
+fprintf('PYTHONPATH        = %s\n', getenv('PYTHONPATH'));
+
+python_exe = getenv('CASPER_PYTHON_EXE');
+
+fprintf('CASPER_PYTHON_EXE = %s\n', getenv('CASPER_PYTHON_EXE'));
+fprintf('PYTHONHOME        = %s\n', getenv('PYTHONHOME'));
+fprintf('PYTHONPATH        = %s\n', getenv('PYTHONPATH'));
+
+% Vivado/Model Composer may inject its own Python environment.
+% Clear that before configuring MATLAB's Python.
+unsetenv('PYTHONHOME');
+unsetenv('PYTHONPATH');
+
+if ~isempty(python_exe)
+    pe = pyenv;
+
+    if pe.Status == "Loaded"
+        if pe.ExecutionMode == "OutOfProcess"
+            terminate(pe);
+        else
+            warning('Python already loaded InProcess; restart MATLAB to switch interpreters.');
+        end
+    end
+
+    pe = pyenv;
+    if pe.Status ~= "Loaded"
+        pyenv("Version", python_exe, "ExecutionMode", "OutOfProcess");
+    end
+
+    disp(pyenv)
+else
+    warning('CASPER_PYTHON_EXE is not set.');
+end
 
 %if vivado is to be used
 if strcmp(jasper_backend, 'vivado') || strcmp(jasper_backend, 'vitis') || isempty(jasper_backend)
@@ -58,10 +98,6 @@ if ~isempty(casper_startup_dir)
     run('./casper_startup.m');
   end
 end
-
-unsetenv('PYTHONHOME');
-unsetenv('PYTHONPATH');
-pyenv("Version", getenv('CASPER_PYTHON_EXE'), "ExecutionMode", "OutOfProcess");
 
 % Add the local python directory to MATLAB's python environment
 insert(py.sys.path, int32(0), [getenv('MLIB_DEVEL_PATH'), '/casper_library/python'])
