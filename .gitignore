@@ -3,6 +3,8 @@
 *.asv
 *.jou
 *.pyc
+hs_err*
+test_*.tcl
 casper_library/Tests/*_output.mat
 casper_library/Tests/xldsp48e_isim.log
 *~
@@ -31,8 +33,12 @@ xps_base/XPS_ROACH2_base/system.xmp.updated
 *.local
 vivado_pid*.str
 
+jasper_library/start_vmc_compile_*
+log.log
 # ignore docs build directory
 docs/_build/
 
 src/*
 workspace/*
+.Xil/*
+slprj/
