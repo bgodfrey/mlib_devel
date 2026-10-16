@@ -37,12 +37,21 @@ function [build_cmd] = jasper_frontend(fn)
     unix_w(cmd);
     disp('*  Frontend python script complete!    *');
     disp('****************************************');
+    // Vivado by default; set JASPER_BACKEND=quartus (e.g. in startsg.local) for Intel targets
+    if getenv('JASPER_BACKEND', 'vivado') == 'quartus' then
+        dsp_opts = ' --be quartus';
+        full_opts = ' --middleware --backend --software --be quartus';
+    else
+        dsp_opts = '';
+        full_opts = ' --middleware --backend --software --vitis';
+    end
+    debug_info('Backend: ' + getenv('JASPER_BACKEND', 'vivado'));
     build_cmd = struct();
     // create a build_cmd for the dsp project
     jasper_python = [getenv('MLIB_DEVEL_PATH')+'/scilab_library/gen_dsp_ip.py'];
-    build_cmd('dsp') = python_path + ' ' + jasper_python + ' '+ '-m ' + modelpath;
+    build_cmd('dsp') = python_path + ' ' + jasper_python + ' '+ '-m ' + modelpath + dsp_opts;
     // create a build_cmd for the full project
     jasper_python = [getenv('MLIB_DEVEL_PATH')+'/jasper_library/exec_flow.py'];
-    build_cmd('full') = python_path + ' ' + jasper_python + ' '+ '-m ' + modelpath + ' --middleware --backend --software --vitis';
+    build_cmd('full') = python_path + ' ' + jasper_python + ' '+ '-m ' + modelpath + full_opts;
 
 endfunction
