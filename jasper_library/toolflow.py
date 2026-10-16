@@ -2096,28 +2096,9 @@ class QuartusBackend(ToolflowBackend):
 			- top.rbf  : <compile_dir>/top.rbf
 			- .fpg     : <compile_dir>/outputs/<design_name>.fpg
 		"""
-		# Add any peripheral Tcl before generating the script
-		self.gen_yellowblock_tcl_cmds()
+		self.run_quartus(cores, plat)
 
-		
-		# Add Quartus DSP IP manifests before compile commands are emitted
-		self.add_dsp_ip_manifests()
-
-		# Populate Tcl with compile commands
-		self.add_compile_cmds_pr(cores=cores, plat=plat)
-
-		# Write full Tcl script
-		helpers.write_file(self.tcl_file, self.eval_tcl())
-		self.logger.info(f'Invoking Quartus shell with TCL script: {self.tcl_file}')
-
-		quartus_path = os.environ.get('QUARTUS_PATH')
-		quartus_sh = os.path.join(quartus_path, 'quartus', 'bin', 'quartus_sh')
-		quartus_cpf = os.path.join(quartus_path, 'quartus', 'bin', 'quartus_cpf')
-		
-		print(self.tcl_file)
-		rv = os.system(f'{quartus_sh} -t "{self.tcl_file}"')
-		if rv:
-			raise Exception('Quartus compilation failed!')
+		quartus_cpf = os.path.join(os.environ.get('QUARTUS_PATH'), 'quartus', 'bin', 'quartus_cpf')
 
 		# Quartus should have produced myproj/output_files/myproj.sof
 		if not os.path.isfile(self.quartus_sof):
@@ -2136,6 +2117,33 @@ class QuartusBackend(ToolflowBackend):
 		# Generate final FPG in compile_dir/outputs/<design>.fpg
 		self.mkfpg(self.bin_loc, self.fpg_loc)
 		self.logger.info(f'Generated FPG at {self.fpg_loc}')
+
+	def run_quartus(self, cores, plat):
+		"""
+		Generate gogogo.tcl and run it with quartus_sh.
+
+		Raises:
+			Exception if quartus_sh exits with an error
+		"""
+		# Add any peripheral Tcl before generating the script
+		self.gen_yellowblock_tcl_cmds()
+
+		# Add Quartus DSP IP manifests before compile commands are emitted
+		self.add_dsp_ip_manifests()
+
+		# Populate Tcl with compile commands
+		self.add_compile_cmds_pr(cores=cores, plat=plat)
+
+		# Write full Tcl script
+		helpers.write_file(self.tcl_file, self.eval_tcl())
+		self.logger.info(f'Invoking Quartus shell with TCL script: {self.tcl_file}')
+
+		quartus_sh = os.path.join(os.environ.get('QUARTUS_PATH'), 'quartus', 'bin', 'quartus_sh')
+
+		print(self.tcl_file)
+		rv = os.system(f'{quartus_sh} -t "{self.tcl_file}"')
+		if rv:
+			raise Exception('Quartus compilation failed!')
 
 	def get_tcl_const(self, const):
 		"""

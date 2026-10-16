@@ -476,6 +476,14 @@ class QuartusDSPBackend(QuartusBackend):
             if filtered_lines:
                 self.tcl_cmds['pre_synth'] += '\n'
 
+    def compile(self, cores=8, plat=None, synth_strat=None, impl_strat=None, threads='multi'):
+        """
+        Run synthesis only. The DSP wrapper is never fitted on its own (see
+        _add_dsp_compile_cmds), so there is no .sof to convert or package; the
+        top-level exec_flow build picks up dspproj_sources.tcl instead.
+        """
+        self.run_quartus(cores, plat)
+
     def add_compile_cmds(self, cores=8, plat=None, synth_strat=None, impl_strat=None, threads='multi'):
         """
         Keep the generic hook aligned with the project-mode hook for any callers that
