@@ -93,7 +93,7 @@ class SIMflow(object):
         """
         self.logger.info('Getting IP core information')
         # get the ip core name
-        self.ip_core['name'] = self.model_info['project']['filename'].split('/')[-1].split('.')[0] + '_core'
+        self.ip_core['name'] = os.path.splitext(os.path.basename(self.model_info['project']['filename']))[0] + '_core'
         # log it
         self.logger.info('IP Core Name: %s' % self.ip_core['name'])
         # get the input ports and output ports info
@@ -289,7 +289,7 @@ class SIMflow(object):
         tb.append('')
         tb.append('endmodule')
         # write the testbench into a file
-        dir = self.model_info['project']['filename'].split('.')[0] + '/simulation'
+        dir = os.path.splitext(self.model_info['project']['filename'])[0] + '/simulation'
         tb_filename = dir + '/' + self.ip_core['name'] + '_tb.v'
         self.logger.info('Writing testbench into %s' % tb_filename)
         with open(tb_filename, 'w') as f:

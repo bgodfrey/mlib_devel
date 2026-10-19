@@ -13,7 +13,7 @@ parser.add_argument("-m", "--model", dest="model", type=str,
             help="model to compile")
 
 opts = parser.parse_args()
-builddir = opts.builddir or opts.model.split('.')[0]
+builddir = opts.builddir or os.path.splitext(opts.model)[0]
 
 logger = logging.getLogger('jasper-sim')
 logger.setLevel(logging.DEBUG)

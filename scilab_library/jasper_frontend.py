@@ -22,7 +22,7 @@ if __name__ == '__main__':
     Step 1: get the project directory and model name, then open jasper.json
     """
     # get the model path and model name
-    builddir = opts.builddir or opts.model.split('.')[0]
+    builddir = opts.builddir or os.path.splitext(opts.model)[0]
     model_name = builddir.split('/')[-1]
 
     # open jasper.json, which contains the block(xps, dsp, sim) info and link info

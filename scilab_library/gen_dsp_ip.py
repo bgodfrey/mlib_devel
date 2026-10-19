@@ -105,7 +105,7 @@ if __name__ == '__main__':
     os.environ['HDL_ROOT_SCILAB'] = effective_scilab_hdl_root
     # get build directory
     # use user defined gen_dsp_ip directory else use a directory with same name as model
-    builddir = opts.builddir or opts.model.split('.')[0]
+    builddir = opts.builddir or os.path.splitext(opts.model)[0]
     # create the build directory before opening the log file
     os.makedirs(builddir, exist_ok=True)
     logger = logging.getLogger('jasper')
