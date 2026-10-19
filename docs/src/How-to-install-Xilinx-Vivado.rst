@@ -8,7 +8,7 @@ This section explains how to install Xilinx Vivado and ISE (for the ISE legacy f
 -------------------------------------------
 
 
-#. Required OS: Ubuntu 2.04 LTS
+#. Required OS: Ubuntu 20.04 LTS
 #. Download the Xilinx Vivado installer `here <https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vivado-design-tools/2021-1.html>`_\ , signing in as prompted and selecting the 2021.1 Linux Self Extracting Web Installer option.
 #. Run the following to make the newly downloaded file executable:
    .. code-block:: bash
@@ -34,6 +34,24 @@ Optional: Install USB Drivers for JTAG
 
 
 #. Please see the Vivado 2021.1 installation guide `here <https://docs.xilinx.com/r/2021.1-English/ug973-vivado-release-notes-install-license/Installing-Cable-Drivers>`_ on how to install cable drivers.
+
+[Current Vivado flow] How to install 2023.1
+-------------------------------------------
+
+Currently, both RFSoC and Red Pitaya boards have been successfully configured to work with Vivado 2023.1 and Matlab R2022a (see `installing the toolflow <https://casper-toolflow.readthedocs.io/en/latest/src/Installing-the-Toolflow.html#getting-the-right-versions>`_ for more information). Installation of Vivado 2023.1 follows the same steps as Vivado 2021.1 so refer to `the previous section <https://casper-toolflow.readthedocs.io/en/latest/src/How-to-install-Matlab.html#current-vivado-flow-how-to-install-r2021a>`_. Changes in steps are noted below:
+
+Step 2. changes -- The Xilinx Vivado installer is `here <https://www.xilinx.com/support/download/index.html/content/xilinx/en/downloadNav/vivado-design-tools/2023-1.html>`_. The web installer has a habit of crashing, so you may want to use the Unified Installer even though the amount of space required is much greater (~300 GB).
+
+
+Step 3. changes -- Assuming that you have downloaded the Unified Installer, then the commands change to:
+
+     .. code-block:: bash
+
+          mkdir $UNZIP_LOC
+          tar -xvzf $DOWNLOAD_LOC/Xilinx_Unified_2023.1_0507_1903.tar.gz -C $UNZIP_LOC
+          sudo $UNZIP_LOC/Xilinx_Unified_2023.1_0507_1903/xsetup
+
+where *\$UNZIP_LOC* is the path to where you want the install directory to be and *\$DOWNLOAD_LOC* is the location of your downloaded .zip file. Depending on where you install Vivado 2023.1, you may not need elevated permissions. Ignore any popups about installing the newest version of the Vivado design suite.
 
 [ISE legacy flow, ROACH2] How to install Xilinx ISE
 ---------------------------------------------------

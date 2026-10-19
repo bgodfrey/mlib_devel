@@ -11,6 +11,7 @@ This section explains how to install MATLAB.
 #. Required OS: Ubuntu 20.04 LTS.
 #. Download the MATLAB installer `here <https://www.mathworks.com/downloads/>`_. Select the ``2021a`` install, and the ``Download for Linux`` option.
 #. Run the following in the terminal:
+
    .. code-block:: bash
 
        cd /path/to/matlab/download/matlab_R2021a_glnxa64.zip
@@ -22,19 +23,34 @@ This section explains how to install MATLAB.
 #. The above will launch the MathWorks product installer and you will be prompted to sign into your MathWorks account. Sign in, accept the licensing agreement, link your MATLAB license and select your installation path in the prompts that follow.
 #. 
    Select the following toolboxes for installation:
-
     
-   .. image:: ../_static/img/toolboxes.png
-      :target: ../_static/img/toolboxes.png
-      :alt: toolboxes.png
+.. image:: ../_static/img/toolboxes.png
 
-
-    *[Note: issues have been encountered where the Xilinx System Generator MATLAB tool may sit indefinitely while generating sysgen IP. This has tentatively been narrowed down to issues in some MATLAB toolboxes, so if your work requires any toolboxes other than the above, please check against the list further down in `this <https://support.xilinx.com/s/question/0D52E00006vF6FOSA0/model-composer-v20212-matlab-r2021a-gets-stuck-at-initialization-stage-on-ubuntu-20041?language=en_US>`_ for any potential conflicts.]* 
+*[Note: issues have been encountered where the Xilinx System Generator MATLAB tool may sit indefinitely while generating sysgen IP. This has tentatively been narrowed down to issues in some MATLAB toolboxes, so if your work requires any toolboxes other than the above, please check against the list further down in `this <https://support.xilinx.com/s/question/0D52E00006vF6FOSA0/model-composer-v20212-matlab-r2021a-gets-stuck-at-initialization-stage-on-ubuntu-20041?language=en_US>`_ for any potential conflicts.]* 
 
 #. 
    Click through the rest of the installation, confirm your selections and begin the install.
 
 #. In order to run the Vivado flow of the CASPER tools, please see `here <https://casper-toolflow.readthedocs.io/en/latest/src/Configuring-the-Toolflow.html>`_.
+
+[Current Vivado Flow] How to install R2022a
+-------------------------------------------
+
+Both RFSoC and Red Pitaya boards have been successfully configured to work with Vivado 2023.1 and Matlab 2022a (see `installing the toolflow <https://casper-toolflow.readthedocs.io/en/latest/src/Installing-the-Toolflow.html#getting-the-right-versions>`_ for more information). Installation of Matlab R2022a follows the same steps as R2021a so refer to `the previous section <https://casper-toolflow.readthedocs.io/en/latest/src/How-to-install-Matlab.html#current-vivado-flow-how-to-install-r2021a>`_. Changes in steps are noted below:
+
+Step 2. changes -- Download the MATLAB installer `here <https://www.mathworks.com/downloads/>`_. Select the `R2022a` install, and the `Download for Linux` option.
+
+
+Step 3. changes -- Run the following in the Terminal:
+
+     .. code-block:: bash
+     
+          cd /path/to/matlab/download/matlab_R2022a_glnxa64.zip
+          mkdir matlab_R2022a
+          unzip matlab_R2022a_glnxa64.zip -d matlab_R2022a
+          cd matlab_R2022a
+          sudo ./install
+
 
 [ISE legacy flow, ROACH2] How to install R2013b
 -----------------------------------------------
@@ -75,4 +91,4 @@ This section explains how to install MATLAB.
 #. 
    Run the script and the MATLAB IDE will launch. You can now select the required MATLAB m files (*.m) and continue.
 
-#. In order to run the ISE-flow of the CASPER tools, please see `here <https://casper.berkeley.edu/wiki/MSSGE_Setup_with_Xilinx_14.x_and_MATLAB_2012b>`_
+#. In order to run the ISE-flow of the CASPER tools, please see `here <https://casper.berkeley.edu/wiki/MSSGE_Setup_with_Xilinx_14.x_and_MATLAB_2012b>`_.

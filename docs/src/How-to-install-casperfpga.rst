@@ -32,6 +32,7 @@ Installing casperfpga using a virtual environment
 #. Ubuntu 14.04 LTS
 #. Ubuntu 16.04 LTS
 #. Ubuntu 18.04 LTS
+#. Ubuntu 20.04 LTS
 #. Debian 8.x
 
 Unfortunately the success of your installation using ``pip`` depends on the host OS of the installation, and you might need to rebuild the utility using the C-compiler native to your OS. In short follow the more traditional method of installing custom Python packages.
