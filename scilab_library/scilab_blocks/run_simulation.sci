@@ -12,7 +12,7 @@ function [cmd] = run_simulation(fn)
     scilab_library_path = getenv('MLIB_DEVEL_PATH')+'/scilab_library';
     cmd = scilab_library_path+'/jasper_frontend.py' + ' ' + '-m ' + modelpath
     debug_info('Frontend python script: ' + cmd);
-    unix_s(cmd);
+    casper_run(cmd);
     disp('*  Frontend python script complete!    *');
     disp('****************************************');
     
@@ -24,7 +24,7 @@ function [cmd] = run_simulation(fn)
     cmd = python_path + ' ' + jasper_python + ' '+ '-m ' + modelpath;
     // TODO: we may need to build the dsp project every time, as users may upate their design.
     if isdir(path+name+'/dspproj') == %F then
-        unix_s(cmd);
+        casper_run(cmd);
     end
     // run python script to start simulation
     jasper_python = [getenv('MLIB_DEVEL_PATH')+'/scilab_library/casper_simulation.py'];

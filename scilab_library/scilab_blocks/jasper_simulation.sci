@@ -9,6 +9,6 @@ function [] = jasper_simulation(fn)
     disp('Starting simulation for model: '+ name);
     cmd = run_simulation(fn);
     debug_info('Simulation command: ' + cmd);
-    unix_w(cmd);
+    casper_run(cmd);
     disp('Simulation finished for model: '+ name);
 endfunction

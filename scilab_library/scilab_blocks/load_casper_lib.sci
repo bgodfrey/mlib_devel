@@ -7,6 +7,7 @@ end
 
 // load the scilab functions
 exec(mlib_dir + 'scilab_library/scilab_blocks/utils/debug_info.sci');
+exec(mlib_dir + 'scilab_library/scilab_blocks/utils/casper_run.sci');
 exec(mlib_dir + 'scilab_library/scilab_blocks/utils/collect_block_info.sci');
 exec(mlib_dir + 'scilab_library/scilab_blocks/utils/get_block_tag.sci');
 exec(mlib_dir + 'scilab_library/scilab_blocks/utils/get_block_type.sci');

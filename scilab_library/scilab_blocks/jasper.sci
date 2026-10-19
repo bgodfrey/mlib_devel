@@ -11,11 +11,11 @@ function [] = jasper(fn)
     disp('****************************************')
     disp('*  Generating DSP IP core...           *')
     disp('****************************************')
-    unix_s(build_cmd('dsp'));
+    casper_run(build_cmd('dsp'));
     disp('****************************************')
     disp('*  Compiling the model...              *')
     disp('****************************************')
-    unix_w(build_cmd('full'));
+    casper_run(build_cmd('full'));
     disp('****************************************')
     disp('*  Backend complete!                   *')
     disp('****************************************')
