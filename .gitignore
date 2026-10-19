@@ -46,3 +46,14 @@ jasper.sim
 scilab_library/*.ipynb
 scilab_library/.ipynb_checkpoints/*
 scripts/
+
+# Crash and tool logs left in the repo root by Scilab (JVM), Vivado and sysgen runs
+/hs_err_pid*.log
+/vivado*.log
+/xsc.log
+*_sysgen_warning.log
+
+# Local Claude Code install
+/node_modules/
+/package.json
+/package-lock.json
