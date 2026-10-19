@@ -15,7 +15,7 @@ module sine_lut #(
     localparam signed [31:0] MAX_ROM_AMPLITUDE = 32'sd32767;
     reg [31:0] sample_index;
     wire [31:0] phase1024 = (sample_index * TONE_BIN) & 32'd1023;
-    wire [1:0] quadrant = phase1024[9:8];HPS lightweight AXI master
+    wire [1:0] quadrant = phase1024[9:8];
     wire [7:0] phase_in_quad = phase1024[7:0];
     wire [8:0] rom_addr = (quadrant[0] == 1'b0) ? {1'b0, phase_in_quad} : (9'd256 - {1'b0, phase_in_quad});
 

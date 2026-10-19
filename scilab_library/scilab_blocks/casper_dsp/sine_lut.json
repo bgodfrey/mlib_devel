@@ -1,0 +1,25 @@
+{
+    "parameters":
+    {
+        "keys":
+        [
+            "name",
+            "fullpath",
+            "tag",
+            "output_width",
+            "fft_length",
+            "tone_bin",
+            "amplitude"
+        ],
+        "values":
+        [
+            "sine_lut",
+            "",
+            "dsp:sine_lut",
+            16,
+            1024,
+            1,
+            12000
+        ]
+    }
+}
