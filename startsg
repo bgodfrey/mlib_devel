@@ -229,10 +229,21 @@ then
   elif [[ ${FRONTEND} == scilab* ]]
   then
     echo "Starting scilab"
-    SCILAB_HOME="/home/bgodfrey/CASPER/Scilab/scilab-2024.1.0"
+    # SCILAB_PATH (from startsg.local) is the scilab executable, e.g. .../scilab-2024.1.0/bin/scilab
+    if ! [ -n "${SCILAB_PATH}" ]
+    then
+      echo "ERROR: SCILAB_PATH is not defined in the current environment."
+      $on_error 1
+    elif ! [ -f "${SCILAB_PATH}" -a -x "${SCILAB_PATH}" ]
+    then
+      echo "ERROR: SCILAB_PATH '${SCILAB_PATH}' is not an executable file."
+      $on_error 1
+    fi
+    SCILAB_EXEC="$(readlink -e "${SCILAB_PATH}")"
+    SCILAB_HOME="$(dirname "$(dirname "$SCILAB_EXEC")")"
     SCILAB_SCI="$SCILAB_HOME/share/scilab"
-    SCILAB_EXEC="$SCILAB_HOME/bin/scilab"
     SCILAB_LIB="$SCILAB_HOME/lib/scilab"
+    echo "Using Scilab from ${SCILAB_HOME}"
 
     unset LD_PRELOAD
     unset LD_LIBRARY_PATH
