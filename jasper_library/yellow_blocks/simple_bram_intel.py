@@ -1,3 +1,5 @@
+import os
+
 from .yellow_block import YellowBlock
 from .yellow_block_typecodes import *
 from memory import Register
@@ -5,7 +7,9 @@ from memory import Register
 class simple_bram_intel(YellowBlock):
 	def initialize(self):
 		self.typecode = TYPECODE_BRAM
-		self.add_source('simple_bram_intel')
+		if not hasattr(self, 'hdl_root_scilab') or not self.hdl_root_scilab:
+			raise RuntimeError('HDL_ROOT_SCILAB is not set; cannot locate simple_bram_intel HDL sources')
+		self.add_source(os.path.join(self.hdl_root_scilab, 'simple_bram_intel/simple_bram_intel.v'))
 
 		self.data_width = int(self.data_width)
 		self.addr_width = int(self.addr_width)
