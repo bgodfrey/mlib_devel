@@ -255,8 +255,19 @@ then
     unset JDK_HOME
     unset JAVA_TOOL_OPTIONS
 
+    # Keep the Python that is active now (e.g. a conda env or CASPER_PYTHON_VENV_ON_START):
+    # jasper() runs the toolflow with it, and the system Python lacks its packages.
+    CASPER_PYTHON_DIR=""
+    if command -v python > /dev/null
+    then
+      CASPER_PYTHON_DIR="$(dirname "$(command -v python)"):"
+      echo "Using python for the toolflow: $(command -v python)"
+    else
+      echo "WARNING: python not found on PATH; jasper() will not be able to run the toolflow."
+    fi
+
     export SCI="$SCILAB_SCI"
-    export PATH="$SCILAB_HOME/bin:/usr/bin:/bin"
+    export PATH="$SCILAB_HOME/bin:${CASPER_PYTHON_DIR}/usr/bin:/bin"
     export LD_LIBRARY_PATH="$SCILAB_LIB:$SCILAB_HOME/thirdparty/redist:$SCILAB_HOME/thirdparty"
     exec "$SCILAB_EXEC" -f "$MLIB_DEVEL_PATH/scilab_library/scilab_blocks/load_casper_lib.sci"
       # For scilab, we don't need to preload the stdc++ library, which crashes scilab
