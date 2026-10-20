@@ -5,4 +5,6 @@ odict
 six
 #xml2vhdl requirements
 lxml
--e git+https://github.com/bgodfrey/xml2vhdl#egg=xml2vhdl_ox&subdirectory=scripts/python/xml2vhdl-ox
+# Intel-capable fork of xml2vhdl. To work on xml2vhdl itself, install your clone instead:
+#   pip install -e <clone>/scripts/python/xml2vhdl-ox
+xml2vhdl-ox @ git+https://github.com/bgodfrey/xml2vhdl@master#subdirectory=scripts/python/xml2vhdl-ox
