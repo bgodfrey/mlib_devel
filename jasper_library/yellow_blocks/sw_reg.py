@@ -48,15 +48,12 @@ class sw_reg(YellowBlock):
                 top.add_axi4lite_interface(regname=self.unique_name, mode='r', nbytes=4, typecode=self.typecode)
                 inst = top.get_instance(entity=module, name=self.fullname)
                 inst.add_parameter('G_BUS_WIDTH', value=32)
-                #inst.add_port('IP_CLK',       signal='axil_clk', parent_sig=False)
-                #inst.add_port('IP_RESET',     signal='axil_rst', parent_sig=False)                
-                #inst.add_port('IP_BUS_VALID', signal='1\'b1', parent_sig=False)
+                # The synchroniser runs in the destination (AXI-Lite) clock domain
+                inst.add_port('IP_CLK',       signal='axil_clk', parent_sig=False)
+                inst.add_port('IP_RESET',     signal='axil_rst', parent_sig=False)
+                inst.add_port('IP_BUS_VALID', signal='1\'b1', parent_sig=False)
                 inst.add_port('IP_BUS',       signal='%s_user_data_in'%self.fullname, width=32, parent_sig=True)
                 inst.add_port('OP_BUS',       signal='%s_%s_in' % (self.blocktype, self.unique_name), width=32, parent_sig=True)
-                # AFTER (correct)
-                inst.add_port('IP_CLK',   signal='user_clk', parent_sig=False)
-                inst.add_port('IP_RESET', signal='user_rst', parent_sig=False)
-                inst.add_port('IP_BUS_VALID', signal='1\'b1', parent_sig=False)  # constant valid is fine for readback
 
             else:
                 
@@ -75,14 +72,13 @@ class sw_reg(YellowBlock):
                 inst = top.get_instance(entity=module, name=self.fullname)
                 inst.add_parameter('G_BUS_WIDTH', value=32)
                 inst.add_parameter('G_OP_INITIAL_VAL', value="32'h%x" % self.init_val)
-                #inst.add_port('IP_CLK',       signal='user_clk', parent_sig=False)
-                #inst.add_port('IP_RESET',     signal='user_rst', parent_sig=False)
+                # The synchroniser runs in the destination (user) clock domain. It samples the
+                # one-cycle write strobe from axil_clk, so user_clk must not be slower than axil_clk.
+                inst.add_port('IP_CLK',       signal='user_clk', parent_sig=False)
+                inst.add_port('IP_RESET',     signal='user_rst', parent_sig=False)
                 inst.add_port('IP_BUS_VALID', signal='%s_%s_out_we' % (self.blocktype, self.unique_name), parent_sig=False)
                 inst.add_port('OP_BUS',       signal='%s_user_data_out'%self.fullname, width=32, parent_sig=True)
                 inst.add_port('IP_BUS',       signal='%s_%s_out'%(self.blocktype, self.unique_name), width=32, parent_sig=True)
-                # AFTER (correct)
-                inst.add_port('IP_CLK',   signal='axil_clk', parent_sig=False)
-                inst.add_port('IP_RESET', signal='axil_rst', parent_sig=False)
             
             else:
                 module = 'wb_register_ppc2simulink_intel' if self.platform == 'intel' else 'wb_register_ppc2simulink'

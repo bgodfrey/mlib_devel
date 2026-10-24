@@ -49,6 +49,10 @@ class xsg(YellowBlock):
             self.requires.append(self.clk_src)  # we need something to provide the clock we plan to use
             self.provides.append('user_clk')
             self.provides.append('adc_clk_sel')            
+        elif (self.platform.manufacturer).lower() == 'intel':
+            # Intel platforms only drive user_clk (see modify_top), not the phase-shifted copies
+            self.requires.append(self.clk_src)
+            self.provides.append('user_clk')
         else:
             self.requires.append(self.clk_src)
             self.requires.append(self.clk_src+'90')

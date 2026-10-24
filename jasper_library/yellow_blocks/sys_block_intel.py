@@ -7,6 +7,7 @@ class sys_block_intel(YellowBlock):
 		self.typecode = TYPECODE_SYSBLOCK
 		#self.add_source('sys_block_intel')
 		self.add_source('sys_block_counter')
+		self.add_source('sys_block_intel/sys_block_counter_cdc.v')
 		if not hasattr(self, 'scratchpad'): self.scratchpad = 0
 		# the internal memory_map
 		self.memory_map = [
@@ -20,14 +21,7 @@ class sys_block_intel(YellowBlock):
 	def modify_top(self,top):
 
 		
-		# Declare user_clk only if it hasn't already been declared
-		#if not top.does_signal_exist('user_clk'):
-
-		#all_signals = [key for inner in (top.signals).values() for key in inner.keys()]
-
-		if not top.does_signal_exist('user_clk'):
-			top.add_signal('user_clk', width=0)
-			top.assign_signal('user_clk', 'axil_clk')          # same domain as AXI-Lite
+		# user_clk is driven by the platform (xsg) block
 
 		if not top.does_signal_exist('user_rst'):
 			top.add_signal('user_rst', width=0)
@@ -70,13 +64,14 @@ class sys_block_intel(YellowBlock):
 			inst.add_port('en', '1')
 			inst.add_port('count_out', signal='sys_clkcounter_cdc', dir='out', width=32)
 
-			inst = top.get_instance(entity='cdc_synchroniser', name='sys_block_counter_cdc_inst')
-			inst.add_parameter('G_BUS_WIDTH', value=32)
-			inst.add_port('IP_CLK', signal='axil_clk', parent_sig=False)
-			inst.add_port('IP_RESET', signal='user_rst', parent_sig=False)
-			inst.add_port('IP_BUS_VALID', signal="1'b1", parent_sig=False)
-			inst.add_port('IP_BUS', signal='sys_clkcounter_cdc', width=32, parent_sig=True)
-			inst.add_port('OP_BUS', signal='sys_clkcounter_in', width=32, parent_sig=True)
+			# The counter runs on user_clk and is read on axil_clk; cross in Gray code so
+			# a read never sees a half-updated count when the two clocks differ
+			inst = top.get_instance(entity='sys_block_counter_cdc', name='sys_block_counter_cdc_inst')
+			inst.add_parameter('DATA_WIDTH', 32)
+			inst.add_port('src_clk', 'user_clk')
+			inst.add_port('src_count', 'sys_clkcounter_cdc', width=32)
+			inst.add_port('dst_clk', 'axil_clk')
+			inst.add_port('dst_count', 'sys_clkcounter_in', width=32)
 
 			top.add_signal('sys_clkcounter_in_we', width=1)
 			top.assign_signal('sys_clkcounter_in_we', "1'b1")	

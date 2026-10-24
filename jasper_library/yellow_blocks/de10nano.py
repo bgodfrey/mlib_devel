@@ -1,6 +1,6 @@
 from .yellow_block import YellowBlock
 from clk_factors import clk_factors
-from constraints import ClockConstraint, PortConstraint
+from constraints import ClockConstraint, PortConstraint, RawConstraint
 import glob, os
 
 # Infer signal width based on common AXI naming conventions
@@ -35,6 +35,30 @@ class de10nano(YellowBlock):
         # Clock frequency from YAML platform config
         self.pl_clk_mhz = self.blk['pl_clk_rate']
         self.T_pl_clk_ns = 1.0/self.pl_clk_mhz*1000
+
+        # User IP clock. 'fpga_clk1_50' runs the DSP straight from the board oscillator, the
+        # same clock as AXI-Lite. 'pll_clk' runs it from a fractional PLL at clk_rate MHz,
+        # asynchronous to AXI-Lite.
+        osc_mhz = 50.0  # FPGA_CLK1_50 oscillator
+        self.user_clk_mhz = float(self.blk['clk_rate'])
+        self.use_pll = self.blk['clk_src'] == 'pll_clk'
+        if self.use_pll:
+            # The PLL and its derived clocks need the real oscillator frequency, so pl_clk_rate
+            # no longer sets the FPGA_CLK1_50 constraint
+            if abs(self.pl_clk_mhz - osc_mhz) > 1e-6:
+                print('WARNING: de10nano: ignoring pl_clk_rate %s MHz with pll_clk; '
+                      'FPGA_CLK1_50 is constrained at %s MHz' % (self.pl_clk_mhz, osc_mhz))
+            self.pl_clk_mhz = osc_mhz
+            self.T_pl_clk_ns = 1.0/self.pl_clk_mhz*1000
+            # sw_reg's From Processor synchroniser samples a one-cycle axil_clk write strobe
+            if self.user_clk_mhz < self.pl_clk_mhz:
+                raise ValueError('de10nano: pll_clk at %s MHz is slower than the %s MHz AXI-Lite clock, '
+                                 'so software register writes could be missed' % (self.user_clk_mhz, self.pl_clk_mhz))
+            self.provides.append('pll_clk')
+            self.add_source('intel_common/intel_user_clk_pll.v')
+        elif abs(self.user_clk_mhz - osc_mhz) > 1e-6:
+            print('WARNING: de10nano: clk_src %s runs user_clk at %s MHz; clk_rate (%s MHz) '
+                  'only takes effect with clk_src pll_clk' % (self.blk['clk_src'], osc_mhz, self.user_clk_mhz))
 
         # Exported board-level signals that other YellowBlocks may request
         for p in ['sys_clk','sys_rst','axil_clk','axil_rst_n','fpga_clk1_50','fpga_clk2_50','fpga_clk3_50','pl_sysref']:
@@ -263,7 +287,21 @@ class de10nano(YellowBlock):
 
         top.add_raw_string("assign axil_rst_n = h2f_rst_n;\n")
         top.add_raw_string("assign axil_rst = ~h2f_rst_n;\n")
-        top.add_raw_string("assign user_rst = ~h2f_rst_n;\n")
+
+        if self.use_pll:
+            # xsg assigns user_clk from pll_clk; user_rst is released on user_clk once the PLL locks
+            top.add_signal('pll_clk')
+            top.add_signal('pll_locked')
+            pll = top.get_instance('intel_user_clk_pll', 'user_clk_pll_inst')
+            pll.add_parameter('REF_CLK_FREQ', '"{:.6f} MHz"'.format(self.pl_clk_mhz))
+            pll.add_parameter('OUT_CLK_FREQ', '"{:.6f} MHz"'.format(self.user_clk_mhz))
+            pll.add_port('refclk', 'fpga_clk1_50')
+            pll.add_port('rst_in', 'axil_rst')
+            pll.add_port('user_clk', 'pll_clk')
+            pll.add_port('user_rst', 'user_rst')
+            pll.add_port('locked', 'pll_locked')
+        else:
+            top.add_raw_string("assign user_rst = ~h2f_rst_n;\n")
 
         # ------------------------------------------------------------------
         # Expose DDR3 pins on top-level to soc_system
@@ -321,6 +359,12 @@ class de10nano(YellowBlock):
         cons.append(ClockConstraint('FPGA_CLK1_50', 'sys_clk', period=self.T_pl_clk_ns, port_en=True, virtual_en=False))
         #cons.append(ClockConstraint('FPGA_CLK1_50', 'sys_clk', period=self.T_pl_clk_ns, port_en=True, virtual_en=False))
         #cons.append(PortConstraint('fpga_clk1_50', 'FPGA_CLK1_50'))
+        if self.use_pll:
+            # Raw constraints keep their order, so the PLL clocks exist before they are grouped.
+            # Every crossing between the two domains goes through a synchroniser.
+            cons.append(RawConstraint('derive_pll_clocks'))
+            cons.append(RawConstraint('set_clock_groups -asynchronous -group [get_clocks {sys_clk}] '
+                                      '-group [get_clocks {*user_clk_pll_inst*}]'))
         return cons
 
     def gen_tcl_cmds(self):

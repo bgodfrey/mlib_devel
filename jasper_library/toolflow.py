@@ -320,10 +320,6 @@ class Toolflow(object):
 			for req_list in [obj.requires, obj.exc_requires]:
 				for req in req_list:
 					self.logger.debug('%s requires %s' % (obj.name, req))
-					# Skip known Vivado-only phase clocks when using Quartus
-					if req in ['fpga_clk1_5090', 'fpga_clk1_50180', 'fpga_clk1_50270'] and self.plat.backend_target == 'quartus':
-						self.logger.warning(f"Skipping DRC check for {req} on Quartus backend")
-						continue
 					if req not in provisions:
 						self.logger.error('NOT SATISFIED: %s requires %s' % (
 							obj.name, req))
@@ -2443,13 +2439,21 @@ class QuartusBackend(ToolflowBackend):
 		qsf_lines += f'set_global_assignment -name NUM_PARALLEL_PROCESSORS {cpu_count}\n'
 
 		
+		# Raw constraints starting with one of these commands are timing constraints
+		sdc_commands = ('create_clock', 'create_generated_clock', 'derive_pll_clocks',
+						'derive_clock_uncertainty', 'set_clock_groups', 'set_clock_uncertainty',
+						'set_false_path', 'set_max_delay', 'set_min_delay', 'set_multicycle_path',
+						'set_input_delay', 'set_output_delay', 'set_max_skew', 'set_net_delay')
+
 		# Go through each constraint and route it to QSF or SDC based on type
 		for constraint in constraints:
 			self.logger.info(f'Parsing constraint: {constraint}')
 			tcl_line = self.get_tcl_const(constraint)
+			raw = getattr(constraint, 'raw', None)
 
 			if isinstance(constraint, (ClockConstraint, ClockGroupConstraint)) or \
-			   constraint.__class__.__name__ in ['ClkConstraint', 'ClkGrpConstraint']:
+			   constraint.__class__.__name__ in ['ClkConstraint', 'ClkGrpConstraint'] or \
+			   (raw and raw.split()[0] in sdc_commands):
 				self.logger.debug(f'  ? SDC constraint: {constraint}')
 				sdc_lines += tcl_line
 			else:

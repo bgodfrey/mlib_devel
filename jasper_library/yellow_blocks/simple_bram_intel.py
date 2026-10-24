@@ -23,9 +23,7 @@ class simple_bram_intel(YellowBlock):
 		self.memory_map = [Register('mem', mode='rw', offset=0, nbytes=self.nbytes, data_width=self.data_width, ram=True, default_val=0 )]
 	
 	def modify_top(self, top):
-		if not top.does_signal_exist('user_clk'):
-			top.add_signal('user_clk', width=0)
-			top.assign_signal('user_clk', 'axil_clk')
+		# user_clk is driven by the platform (xsg) block
 
 		#if not top.does_signal_exist('user_rst'):
 		#	top.add_signal('user_rst', width=0)

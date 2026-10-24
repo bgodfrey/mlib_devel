@@ -51,9 +51,7 @@ class snapshot(YellowBlock):
             top.assign_signal(name, default)
 
     def modify_top(self, top):
-        if not top.does_signal_exist('user_clk'):
-            top.add_signal('user_clk', width=0)
-            top.assign_signal('user_clk', 'axil_clk')
+        # user_clk is driven by the platform (xsg) block
 
         # Graph-facing inputs are expected to be driven by the generated IP wrapper
         # or explicit top-level wiring, so don't add fallback constants here.
@@ -73,17 +71,30 @@ class snapshot(YellowBlock):
             data_width=self.data_width,
         )
 
+        # busy and done come from user_clk; pass each through a two-register
+        # synchroniser on axil_clk before the status registers sample it
+        for status in ['busy', 'done']:
+            self._ensure_signal(top, f'{self.fullname}_{status}_axil', 1)
+            sync = top.get_instance(entity='cdc_synchroniser', name=f'{self.fullname}_{status}_sync')
+            sync.add_parameter('G_BUS_WIDTH', value=1)
+            sync.add_port('IP_CLK', signal='axil_clk', parent_sig=False)
+            sync.add_port('IP_RESET', signal='axil_rst', parent_sig=False)
+            sync.add_port('IP_TRIGGER', signal=f'{self.fullname}_{status}', parent_sig=False)
+            sync.add_port('OP_TRIGGER', signal=f'{self.fullname}_{status}_axil', parent_sig=False)
+            sync.add_port('IP_BUS_VALID', signal="1'b0", parent_sig=False)
+            sync.add_port('IP_BUS', signal="1'b0", parent_sig=False)
+
         self._ensure_signal(top, f'{self.unique_name}_busy_in', 32)
         top.assign_signal(
             f'{self.unique_name}_busy_in',
-            "{{31{1'b0}}, %s}" % (f'{self.fullname}_busy')
+            "{{31{1'b0}}, %s}" % (f'{self.fullname}_busy_axil')
         )
         self._ensure_signal(top, f'{self.unique_name}_busy_in_we', 1, "1'b1")
 
         self._ensure_signal(top, f'{self.unique_name}_done_in', 32)
         top.assign_signal(
             f'{self.unique_name}_done_in',
-            "{{31{1'b0}}, %s}" % (f'{self.fullname}_done')
+            "{{31{1'b0}}, %s}" % (f'{self.fullname}_done_axil')
         )
         self._ensure_signal(top, f'{self.unique_name}_done_in_we', 1, "1'b1")
 
